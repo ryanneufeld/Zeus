@@ -23,8 +23,9 @@
 
  */
 
-#define DEBUG 0;
-#define LOGFILE "sensor_log.csv"
+#define DEBUG
+// MUST BE 8.3 FILENAME FORMAT!!
+#define LOGFILE "sensor.csv"
 //#define DHTTYPE DHT11   // DHT 11 
 //#define DHTTYPE DHT22   // DHT 22  (AM2302)
 #define DHTTYPE DHT21   // DHT 21 (AM2301)
@@ -41,27 +42,36 @@ const int chipSelect = 4;
 void setup()
 {
  // Open serial communications and wait for port to open:
-  Serial.begin(9600);
-   while (!Serial) {
-    ; // wait for serial port to connect. Needed for Leonardo only
-  }
-
+  Serial.begin(28800);
+  
+  while (!Serial); // wait for serial port to connect. Needed for Leonardo only
+  
   // Start reading from sensors
   dht1.begin();
   dht2.begin();
 
- Serial.print("Initializing SD card...");
+  #ifdef DEBUG
+  Serial.print("Initializing SD card...");
+  #endif /* DEBUG */
+  
   // make sure that the default chip select pin is set to
   // output, even if you don't use it:
   pinMode(10, OUTPUT);
   
   // see if the card is present and can be initialized:
   if (!SD.begin(chipSelect)) {
+    // TODO Add LED notification of card failure.
+    #ifdef DEBUG
     Serial.println("Card failed, or not present");
+    #endif /* DEBUG */
+    
     // don't do anything more:
     return;
   }
-  Serial.println("card initialized.");
+  
+  #ifdef DEBUG
+  Serial.println(" done!");
+  #endif /* DEBUG */
 }
 
 void loop()
@@ -81,7 +91,10 @@ void loop()
 
   // check if returns are valid, if they are NaN (not a number) then something went wrong!
   if (isnan(t1) || isnan(h1)) {
+    #ifdef DEBUG
     Serial.println("Failed to read from DHT1");
+    #endif /* DEBUG */
+    
     dataString1 += "NaN,NaN";
   } else {
     dataString1 = String(t1) + "," + String(h1);
@@ -89,7 +102,10 @@ void loop()
 
   // check if returns are valid, if they are NaN (not a number) then something went wrong!
   if (isnan(t2) || isnan(h2)) {
+    #ifdef DEBUG
     Serial.println("Failed to read from DHT2");
+    #endif /* DEBUG */
+
     dataString2 += "NaN,NaN";
   } else {
     dataString2 = String(t2) + "," + String(h2);
@@ -105,15 +121,17 @@ void loop()
   if (dataFile) {
     dataFile.println(dataString);
     dataFile.close();
-    // print to the serial port too:
-
   }
   // if the file isn't open, pop up an error:
   else {
-    Serial.println("error opening " + LOGFILE);
+    #ifdef DEBUG
+    Serial.println("error opening " + String(LOGFILE));
+    #endif /* DEBUG */
   }
 
+  #ifdef DEBUG
   Serial.println(dataString);
+  #endif /* DEBUG */
   
   delay(4000);
 }
