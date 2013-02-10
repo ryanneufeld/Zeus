@@ -30,6 +30,9 @@
 //#define DHTTYPE DHT22   // DHT 22  (AM2302)
 #define DHTTYPE DHT21   // DHT 21 (AM2301)
 
+// Sensor polling time is 5 seconds
+#define DELAY 5000
+
 DHT dht1(2, DHTTYPE);
 DHT dht2(3, DHTTYPE);
 
@@ -133,7 +136,8 @@ void loop()
   Serial.println(dataString);
   #endif /* DEBUG */
   
-  delay(4000);
+  // TODO Replace this with RTC check or possibly config file.
+  delay(DELAY);
 }
 
 
