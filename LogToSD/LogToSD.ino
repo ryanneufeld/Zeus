@@ -24,6 +24,7 @@
  */
 
 #define DEBUG
+#define DEVICEID "cturra" // options: cturra / ryanneufeld
 // MUST BE 8.3 FILENAME FORMAT!!
 #define LOGFILE "sensor.csv"
 //#define DHTTYPE DHT11   // DHT 11 
@@ -87,11 +88,21 @@ void loop()
   // Collect temp an humidity values
   int h1 = (int) (dht1.readHumidity() * 100);
   int t1 = (int) (dht1.readTemperature() * 100);
-
+  
   // Collect temp an humidity values  
   int h2 = (int) (dht2.readHumidity() * 100);
   int t2 = (int) (dht2.readTemperature() * 100);
-
+  
+  // calibrate sensors based on temperature@lert (cturra)
+  if (DEVICEID == "cturra") {
+    t1 = (t1-80);
+    t2 = (t2-50);
+    h1 = (h1+150);
+    h2 = (h2+250);
+  } else if (DEVICEID == "ryanneufeld") {
+    //ryan's adjustments
+  }
+  
   // check if returns are valid, if they are NaN (not a number) then something went wrong!
   if (isnan(t1) || isnan(h1)) {
     #ifdef DEBUG
