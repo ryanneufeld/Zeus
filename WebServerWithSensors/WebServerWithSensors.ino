@@ -27,6 +27,7 @@ byte mac[] = {
   0x00, 0xAA, 0xBB, 0xCC, 0xDE, 0x02 };
 
 DHT dht1(2, DHTTYPE);
+DHT dht2(3, DHTTYPE);
 
 // Initialize the Ethernet client library
 // with the IP address and port of the server 
@@ -62,15 +63,21 @@ void setup() {
 }
 
 void loop() {
-  // make a string for assembling the data to log:
-  String dataString1 = "";
   
   // Collect temp an humidity values
   int h1 = (int) (dht1.readHumidity() * 100);
   int t1 = (int) (dht1.readTemperature() * 100);
   
-  dataString1 = String(t1) + "," + String(h1);
-  
+  // Collect temp an humidity values  
+  int h2 = (int) (dht2.readHumidity() * 100);
+  int t2 = (int) (dht2.readTemperature() * 100);
+
+  // calibrate sensors based on temperature@lert
+  t1 = (t1-80);
+  t2 = (t2-50);
+  h1 = (h1+50);
+  h2 = (h2+120);
+    
   // listen for incoming clients
   EthernetClient client = server.available();
   if (client) {
@@ -95,13 +102,16 @@ void loop() {
           client.println("<html>");
           
           // add a meta refresh tag, so the browser pulls again every 5 seconds:
-          client.println("<meta http-equiv=\"refresh\" content=\"5\">");
+          client.println("<meta http-equiv=\"refresh\" content=\"10\">");
 
           client.print("<b>Sensors 1:</b>");
-          client.print("<br /> - Temperature: ");
-          client.println(String(t1));
-          client.print("<br /> Humidity: ");
-          client.println(String(h1));     
+          client.print("<br /> - Temperature: " + String(t1/100) + "c");
+          client.println("<br /> - Humidity: " + String(h1/100)+ "%");
+          
+          client.print("<br /><br />");
+          client.print("<b>Sensors 2:</b>");
+          client.print("<br /> - Temperature: " + String(t2/100) + "c");
+          client.println("<br /> - Humidity: " + String(h2/100)+ "%");
           
           client.println("</html>");
           break;    
