@@ -1,137 +1,112 @@
-/*
-  DHCP-based IP printer
- 
- This sketch uses the DHCP extensions to the Ethernet library
- to get an IP address via DHCP and print the address obtained.
- using an Arduino Wiznet Ethernet shield. 
- 
- Circuit:
- * Ethernet shield attached to pins 10, 11, 12, 13
- 
- created 12 April 2011
- modified 9 Apr 2012
- by Tom Igoe
- 
- */
+#include "DHT.h"
+#include "SPI.h"
+#include "Ethernet.h"
+#include "WebServer.h"
 
-#include <DHT.h>
-#include <SPI.h>
-#include <Ethernet.h>
+// no-cost stream operator as described at 
+// http://sundial.org/arduino/?page_id=119
+template<class T>
+inline Print &operator <<(Print &obj, T arg)
+{ obj.print(arg); return obj; }
 
-#define PORT 80
-#define DHTTYPE DHT21   // DHT 21 (AM2301)
+static uint8_t MAC[] = { 0x00, 0xAA, 0xBB, 0xCC, 0xDE, 0x02 };
 
-// Enter a MAC address for your controller below.
-// Newer Ethernet shields have a MAC address printed on a sticker on the shield
-byte mac[] = {  
-  0x00, 0xAA, 0xBB, 0xCC, 0xDE, 0x02 };
+#define PORT    80
+#define PREFIX  ""
+#define DHTTYPE DHT21 /* DHT 21 (AM2301) */
 
 DHT dht1(2, DHTTYPE);
 DHT dht2(3, DHTTYPE);
 
-// Initialize the Ethernet client library
-// with the IP address and port of the server 
-EthernetServer server(PORT); 
 
-// On the Ethernet Shield, CS is pin 4. Note that even if it's not
-// used as the CS pin, the hardware CS pin (10 on most Arduino boards,
-// 53 on the Mega) must be left as an output or the SD library
-// functions will not work.
-const int chipSelect = 4;
+WebServer webserver(PREFIX, PORT);
 
-void setup() {
- // Open serial communications and wait for port to open:
-  Serial.begin(9600);
-   while (!Serial); // wait for serial port to connect. Needed for Leonardo only
+float readTemperature(DHT dht, int sensorNum) {
+  float temperature = dht.readTemperature();
+  float calibratedTemperature = 0.0;
 
-
-  // start the Ethernet connection:
-  if (Ethernet.begin(mac) == 0) {
-    Serial.println("Failed to configure Ethernet using DHCP");
-    // no point in carrying on, so do nothing forevermore:
-    for(;;)
-      ;
+  /* calibrate temperature sensors */
+  if (sensorNum == 1) {
+    calibratedTemperature = (temperature-0.8);
   }
-  // print your local IP address:
-  Serial.print("My IP address: ");
-  for (byte thisByte = 0; thisByte < 4; thisByte++) {
-    // print the value of each byte of the IP address:
-    Serial.print(Ethernet.localIP()[thisByte], DEC);
-    Serial.print("."); 
+  else if (sensorNum == 2){
+    calibratedTemperature = (temperature-0.5);
   }
-  Serial.println();
+
+  return calibratedTemperature;
 }
 
-void loop() {
-  
-  // Collect temp an humidity values
-  int h1 = (int) (dht1.readHumidity() * 100);
-  int t1 = (int) (dht1.readTemperature() * 100);
-  
-  // Collect temp an humidity values  
-  int h2 = (int) (dht2.readHumidity() * 100);
-  int t2 = (int) (dht2.readTemperature() * 100);
+float readHumidity(DHT dht, int sensorNum) {
+  float humidity = dht.readHumidity();
+  float calibratedHumidity = 0.0;
 
-  // calibrate sensors based on temperature@lert
-  t1 = (t1-80);
-  t2 = (t2-50);
-  h1 = (h1+50);
-  h2 = (h2+120);
-    
-  // listen for incoming clients
-  EthernetClient client = server.available();
-  if (client) {
-    Serial.println("new client");
-    // an http request ends with a blank line
-    boolean currentLineIsBlank = true;
-    
-    while (client.connected()) {
-      if (client.available()) {
-        char c = client.read();
-        Serial.write(c);
-        // if you've gotten to the end of the line (received a newline
-        // character) and the line is blank, the http request has ended,
-        // so you can send a reply
-        if (c == '\n' && currentLineIsBlank) {
-          // send a standard http response header
-          client.println("HTTP/1.1 200 OK");
-          client.println("Content-Type: text/html");
-          client.println("Connnection: close");
-          client.println();
-          client.println("<!DOCTYPE HTML>");
-          client.println("<html>");
-          
-          // add a meta refresh tag, so the browser pulls again every 5 seconds:
-          client.println("<meta http-equiv=\"refresh\" content=\"10\">");
+  /* calibrate humidity sensors */
+  if (sensorNum == 1) {
+    calibratedHumidity = (humidity+0.5);
+  }
+  else if (sensorNum == 2){
+    calibratedHumidity = (humidity+1.2);
+  }
 
-          client.print("<b>Sensors 1:</b>");
-          client.print("<br /> - Temperature: " + String(t1/100) + "c");
-          client.println("<br /> - Humidity: " + String(h1/100)+ "%");
-          
-          client.print("<br /><br />");
-          client.print("<b>Sensors 2:</b>");
-          client.print("<br /> - Temperature: " + String(t2/100) + "c");
-          client.println("<br /> - Humidity: " + String(h2/100)+ "%");
-          
-          client.println("</html>");
-          break;    
-        }
-        if (c == '\n') {
-          // you're starting a new line
-          currentLineIsBlank = true;
-        } 
-        else if (c != '\r') {
-          // you've gotten a character on the current line
-          currentLineIsBlank = false;
-        }
-      }
-    }
-    // give the web browser time to receive the data
-    delay(1);
-    // close the connection:
-    client.stop();
-    Serial.println("client disonnected");
-  }  
+  return humidity;
+}
+
+void sensorCmd(WebServer &server, WebServer::ConnectionType type)
+{
+  P(htmlHead) =
+    "<html>"
+    "<head>"
+    "<title>Arduino Web Server</title>"
+    "<style type=\"text/css\">"
+    "BODY { font-family: Tahoma }"
+    "H1 { font-size: 14pt; text-decoration: underline }"
+    "P  { font-size: 10pt; }"
+    "</style>"
+    "<meta http-equiv=\"refresh\" content=\"10\">"
+    "</head>"
+    "<body>";
+
+   P(htmlFoot) = 
+     "</body>"
+     "</html>";
+
+  server.httpSuccess();
+  server.printP(htmlHead);
+
+  float temp1   = readTemperature(dht1,1);
+  float temp2   = readTemperature(dht2,2);
+  float humid1  = readHumidity(dht1,1);
+  float humid2  = readHumidity(dht2,2);
+
+  server << "<h1>Sensor:</h1><ul>";
+  server << "<li>temperature 1: " << temp1 << "</li>";
+  server << "<li>humidity 1: " << humid1 << "</li>";
+  server << "<li>temperature 2: " << temp2 << "</li>";
+  server << "<li>humidity 2: " << humid2 << "</li>";
+  server << "</ul>";
+
+  server.printP(htmlFoot);
 }
 
 
+void defaultCmd(WebServer &server, WebServer::ConnectionType type, char *url_tail, bool tail_complete)
+{
+  sensorCmd(server, type);  
+}
+
+void setup()
+{
+  Ethernet.begin(MAC);
+  webserver.begin();
+
+  webserver.setDefaultCommand(&defaultCmd);
+  webserver.addCommand("index.html", &defaultCmd);
+}
+
+void loop()
+{
+  // process incoming connections one at a time forever
+  webserver.processConnection();
+
+  // if you wanted to do other work based on a connecton, it would go here
+}
